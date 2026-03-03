@@ -284,7 +284,7 @@ void MDNS::DoReload(void) {
         socks[i].sock = sock;
         socks[i].buffer = (char*)buffer + i * capacity;
         socks[i].query_id = mdns_query_send(sock, record, service_name, strlen(service_name),
-            socks[i].buffer, capacity, sock);
+            socks[i].buffer, capacity, 0); // Use ID 0 for mDNS discovery compatibility (RFC 6762 Section 18.1)
 
         if (socks[i].query_id < 0) {
             elog("Failed to send mDNS query: %s\n", strerror(errno));
@@ -313,10 +313,11 @@ void MDNS::DoReload(void) {
                 auto sock = socks[i].sock;
                 auto buffer = socks[i].buffer;
                 auto query_id = socks[i].query_id;
-                if (query_id && FD_ISSET(sock, &read_fds)) {
+                if (query_id >= 0 && FD_ISSET(sock, &read_fds)) {
                     void* user_data = this;
-                    mdns_query_recv(sock, buffer, capacity, query_callback, user_data, query_id);
-                }
+                    // Standard mDNS support (RFC 6762 18.1): Ignore ID to accept all responses
+                    mdns_query_recv(sock, buffer, capacity, query_callback, user_data, 0);
+		}
             }
         } while ((os_gettime_ns() / NS_MS_FACTOR) < time_end);
     }
